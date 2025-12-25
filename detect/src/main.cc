@@ -73,11 +73,10 @@ Image<unsigned char> compute_dct(const Image<unsigned char> &image, int block_si
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_mpi);
     MPI_Comm_size(MPI_COMM_WORLD, &procs);
     
-    // Imagen de ENTRADA (original)
     Image<float> grayscale = image.convert<float>().to_grayscale();
     std::vector<Block<float>> input_blocks = grayscale.get_blocks(block_size);
     
-    // Imagen de SALIDA (en ceros para acumular resultados)
+    // En ceros para acumular resultados
     Image<float> output(grayscale.width, grayscale.height, 1);
     for(int i=0; i<output.width * output.height; i++) {
         output.matrix.get()[i] = 0.0f;
@@ -92,24 +91,19 @@ Image<unsigned char> compute_dct(const Image<unsigned char> &image, int block_si
         dct::direct(dctBlock, input_blocks[i], 0);
         
         if (invert) {
-            // Filtrar frecuencias altas
             for(int k=0; k<block_size/2; k++)
                 for(int l=0; l<block_size/2; l++)
                     dctBlock[k][l] = 0.0;
-            // DCT inverso al bloque de SALIDA
             dct::inverse(output_blocks[i], dctBlock, 0, 0.0, 255.);
         } else {
-            // Asignar resultado al bloque de SALIDA
             dct::assign(dctBlock, output_blocks[i], 0);
         }
         dct::delete_matrix(dctBlock);
     }
     
-    // Sincronización: sumar los bloques procesados por cada proceso
+    // Sincronización sumando los bloques procesados por cada proceso
     if (procs > 1) {
-        MPI_Allreduce(MPI_IN_PLACE, output.matrix.get(), 
-                      output.width * output.height, 
-                      MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+        MPI_Allreduce(MPI_IN_PLACE, output.matrix.get(), output.width * output.height, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
     }
     
     Image<unsigned char> result = output.convert<unsigned char>();
