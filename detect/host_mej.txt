@@ -1,0 +1,2 @@
+archmej slots=10
+debmej slots=10
